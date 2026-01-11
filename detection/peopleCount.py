@@ -1,10 +1,6 @@
-from datetime import datetime, timezone, timedelta
-import os
 import cv2
 from ultralytics import YOLO
 import schedule
-import requests
-from dotenv import load_dotenv
 import time
 import threading
 
@@ -17,38 +13,19 @@ class PeopleCount(threading.Thread):
 
     resourceSrv = providers.Singleton(ResourceService)
     resourceSrv().initialization()
-    def __init__(self, thread_id, camera_indx = None):
+    def __init__(self, thread_id, camera_indx = None, bus_id = None, bus_capacity = None, stpEvent: threading.Event = None):
         super(PeopleCount, self).__init__()
+        self.bus_id = bus_id
+        self.bus_capacity = bus_capacity
         self.thread_id = thread_id
         self.camera_index = camera_indx
         self.logger = OpswLogger(f"thread_{thread_id}")
         self.logger.initialization()
-        # self.busId = None
-        # self.busCapacity = None
+        self.window_name =f"PeopleCount Thread {self.thread_id}"
         self.passengers = 0
-        self.stop_event = threading.Event()
+        self.stop_event = stpEvent
         self._finished = False
-        # self.routeId = None
-
-    # def loadEnviroment(self):
-    #     # Main procedure of project
-    #     # Load Application Properties
-    #     load_dotenv()
-    #     self.logger.logger.info("Enviroment loaded successfully.")
-    #     # self.busId = os.getenv("bus.id")
-    #     # if self.busId == None:
-    #     #     raise Exception("Δεν έχει οριστεί κωδικός λεοφωρείου.")
-    #     # busCapacitryStr = os.getenv("bus.capacity")
-    #     # if busCapacitryStr == None:
-    #     #     raise Exception("Δεν έχει ορισθεί χωρητικότητα λεοφωρείου.")
-    #     # self.busCapacity = self.strToInt(busCapacitryStr)
-
-    #     # Δεν χρειάζεται εδώ. Θα το ξέρει το Container το routeId που θα κάνει 
-    #     # request στο Server.
-    #     # routeIdStr = os.getenv("route.id")
-    #     # if routeIdStr == None:
-    #     #     raise Exception("Δεν έχει ορισθεί κωδικός διαδρομής λεοφωρείου.")
-    #     # self.routeId = self.strToInt(routeIdStr)
+        print(f"PeopleCount Thread {self.thread_id} initialized.")
     
     def getPassengers(self):
         # print(f"Thread {self.thread_id} current passengers are {self.passengers}")
@@ -73,14 +50,13 @@ class PeopleCount(threading.Thread):
         while True:
             schedule.run_pending()
             time.sleep(1)
-    
-    def updateCapacity(self):
-        tz = timezone(timedelta(hours=3))
-        self.resourceSrv().postCapacity(self.routeId, self.busId, self.busSenu, self.busCapacity, self.passengers, datetime.now(tz))
 
     def run(self):
         # self.loadEnviroment()
         # perform some action
+        if self.bus_id is None:
+            print("Bus ID is not provided. Exiting thread.")
+            return
         self.logger.logger.info("People count process started.")
         self.__peopleCount()
     
@@ -96,14 +72,14 @@ class PeopleCount(threading.Thread):
         model = YOLO("yolov8n.pt")
 
 
-        last_post = time.time()
-        post_interval = 30  # seconds
+        # last_post = time.time()
+        # post_interval = 30  # seconds
 
         # Dummy function for person detection (replace with YOLO/dnn)
         def detect_people(frame):
             resultBoxes = []
             # Return list of bounding boxes [x, y, w, h]
-            results = model(frame)
+            results = model(frame, verbose=False)
             for r in results:
                 for box in r.boxes:
                     cls = int(box.cls[0])
@@ -121,6 +97,10 @@ class PeopleCount(threading.Thread):
             return {i: (int((x+w)/2), int((y+h)/2)) for i, (x, y, w, h) in enumerate(detections)}
 
         cap = cv2.VideoCapture(self.camera_index)
+
+        if not cap.isOpened():
+            print(f"Error: Could not open camera with index {self.camera_index}")
+            return
         widthFrame = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         heightFrame = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
@@ -129,6 +109,7 @@ class PeopleCount(threading.Thread):
                 break
             ret, frame = cap.read()
             if not ret:
+                print("Error: Δεν μπόρεσα να διαβάσω frame (Video ended or Camera disconnected).")
                 break
 
             detections = detect_people(frame)
@@ -152,29 +133,25 @@ class PeopleCount(threading.Thread):
                 cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
 
             cv2.line(frame, (line_position, 0), (line_position, frame.shape[0]), (255, 0, 0), 2)
-            cv2.putText(frame, f'IN: {in_count}', (widthFrame - 150, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 1)
-            cv2.putText(frame, f'OUT: {out_count}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 1)
 
-            cv2.putText(frame, f'ID: {self.busId}', (10, heightFrame - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 1)
-            cv2.putText(frame, f'CAP: {self.busCapacity}', (10, heightFrame - 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 1)
-            tempCap = in_count - out_count
-            if tempCap <= 0 :
-                self.passengers = 0
-            else:
-                self.passengers = tempCap
+
+            # Πίνακας αποτελεσμάτων
+            cv2.putText(frame, f'IN: {in_count}', (widthFrame - 150, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+            cv2.putText(frame, f'OUT: {out_count}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+
+
+            
+            cv2.putText(frame, f'ID: {self.bus_id}', (10, heightFrame - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+            cv2.putText(frame, f'CAP: {self.bus_capacity}', (10, heightFrame - 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+            self.passengers = in_count - out_count
             #Add Text in Frame about bus Capacity
-            cv2.putText(frame, f'Passenger: {self.passengers}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 1)
+            cv2.putText(frame, f'Passenger: {self.passengers}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 2)
 
-            # Check if it's time to post data on backend
-            if time.time() - last_post >= post_interval:
-                thread = threading.Thread(target=self.updateCapacity)
-                thread.start()
-                # self.updateCapacity()
-                last_post = time.time()
-
-
-            #Create the Window with frames
-            cv2.imshow("Passenger Counter", frame)
+            cv2.imshow(self.window_name, frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 self.stop_event.set()
                 break
+        # Καθαρισμός
+        cap.release()
+        cv2.destroyWindow(self.window_name)
+        self._finished = True

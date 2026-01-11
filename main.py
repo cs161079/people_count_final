@@ -1,5 +1,6 @@
 from datetime import timedelta, timezone, datetime
 import os
+import signal
 from typing import List
 import zoneinfo
 import cv2
@@ -7,6 +8,9 @@ from dotenv import load_dotenv
 from detection.models.line import Line
 from detection.models.route import Route, Stop
 from detection.peopleCount import PeopleCount
+from detection.peopleCount02 import PeopleCount02
+from detection.peopleCount03 import PeopleCount03
+from detection.peopleCount04 import PeopleCount04
 from detection.rest import ResourceService
 from utils.opsw_logger import OpswLogger
 from dependency_injector import providers
@@ -62,10 +66,10 @@ class Container:
         # Αρχικοποιήση του Logger
         self.logger().initialization()
         # Έλεγχος του Mode που θα δουλέψει simulation ή production
-        if self.mode == "s":
-            self._simulation_master()
+        if self.mode in ["c", "v"]:
+            self._realTask_withCv()
         else:
-            self.realTask()
+            self._simulation_master()
 
     def _fixSchedule(self, schedules: list[Schedule]) -> list[Schedule]:
         result: list[Schedule] = []
@@ -263,49 +267,87 @@ class Container:
         scheduler_thread.join()
         print("All threads have stopped.")
     
-    def enumerate_cameras(self, max_index=10):
-        available = []
+    def enumerate_cameras(self, max_index=10) -> List[int]:
+        available: List[int] = []
         for i in range(max_index):
             cap = cv2.VideoCapture(i)
             if cap.isOpened():
-                available.append(i)
                 cap.release()
+                available.append(i)
+                
         return available
     
+    def _trheads_for_cameras(self):
+        # Δημιουργία και εκκίνηση των thread για κάθε κάμερα ή κάθε βίντεο
+        for camera_info in self.enumerate_cameras(3):       
+            t = PeopleCount(camera_indx=camera_info, bus_id= self.bus_id, bus_capacity=self.bus_capacity, 
+                            thread_id=camera_info, stpEvent=self.scheduler_stop_event)
+            self.logger().logger.info(f"Simulation thread with ID {t.thread_id} created successfully.")
+            self.threadsArray.append(t)
+            self.threadsArray[-1].start()
+
+    def _threads_for_videos(self):
+        # Δημιουργία thread με το sample_1.mp4 βίντεο για αναπαράσταση επιβίβασης
+        # t = PeopleCount02(thread_id=1, stpEvent=self.scheduler_stop_event)
+        # self.logger().logger.info(f"PeopleCount03 thread with ID {t.thread_id} created successfully.")
+        # self.threadsArray.append(t)
+        # self.threadsArray[-1].start()
+
+        # # Δημιουργία thread με το ίδιο βίντεο αλλά αντίστρφοη αναπραγωγή για αναπαράσταση αποβίβασης
+        # t = PeopleCount02(thread_id=2, stpEvent=self.scheduler_stop_event, filename="sample_4.mp4")
+        # self.logger().logger.info(f"PeopleCount03 thread with ID {t.thread_id} created successfully.")
+        # self.threadsArray.append(t)
+        # self.threadsArray[-1].start()
+
+        # # Δημιουργία thread με το sample_3 το οποίο έχει και έξοδο και είσοδο
+        # t = PeopleCount03(thread_id=3, stpEvent=self.scheduler_stop_event)
+        # self.logger().logger.info(f"PeopleCount03 thread with ID {t.thread_id} created successfully.")
+        # self.threadsArray.append(t)
+        # self.threadsArray[-1].start()
+
+        t = PeopleCount04(thread_id=3, stpEvent=self.scheduler_stop_event)
+        self.logger().logger.info(f"PeopleCount04 thread with ID {t.thread_id} created successfully.")
+        self.threadsArray.append(t)
+        self.threadsArray[-1].start()
+
     # Είναι η μέθοδος για παραγωγικό περιβάλλον η οποία φτιάχνει 
     # τόσα thread όσα και οι κάμερες
-    def realTask(self):
-        for camera_info in self.enumerate_cameras(3):
-            # print(f'{camera_info.index}: {camera_info.name}')
-            t = PeopleCount(camera_info.index, camera_info.index)
-            self.logger().logger.info(f"Simulation thread with ID {t.thread_id} created successfully.")
-            self.threadsArray.append()
-            t.start()
-        # Start scheduler in separate thread
-        scheduler_thread = threading.Thread(target=self._start_scheduler)
-        scheduler_thread.start()
-
-        try:
-            while True:
-                if self.scheduler_stop_event.is_set():
-                    break
-                # time.sleep(0.5)
-        except KeyboardInterrupt:
-            print("❗ KeyboardInterrupt triggered.")
+    def _realTask_withCv(self):
+        def signal_handler(sig, frame):
+            print("\nΠατήθηκε Ctrl+C! Τερματισμός...")
             self.scheduler_stop_event.set()
+        signal.signal(signal.SIGINT, signal_handler)
         
-        # Shutdown logic
-        self._stopAllThreads()
-        # scheduler_stop_event.set()
-        print("Stop Thread for Scheduler.")
+        if self.mode == "c":
+            self._trheads_for_cameras()
+        else:
+            self._threads_for_videos()
+        # Δημιουργία Scheduler για την αποστολή των δεδομένων στον Application Server
+        scheduler_thread = threading.Thread(target=self._start_scheduler)
+        scheduler_thread.start()        
+
+        # Όσο δεν έχει γίνει set το stop event, περιμένει
+        while not self.scheduler_stop_event.is_set():
+            try:
+                time.sleep(0.5)
+            # time.sleep(0.5)
+            except KeyboardInterrupt:
+                print("❗ KeyboardInterrupt triggered.")
+                self.scheduler_stop_event.set()
+        
+        # Περιμένει μέχρι να ολοκληρωθούν όλα τα threads
+        for t in self.threadsArray:
+            t.join
+
+        # Περιμένει μέχρι να ολοκληρωθεί το thread του scheduler
         scheduler_thread.join()
         print("All threads have stopped.")            
 
-    def _start_scheduler(self, sdc_code: int, start_date: datetime):
-        self.scheduler.enter(self.deamon_delay, 1, self._update_capacity, argument=(sdc_code, start_date,))
+    def _start_scheduler(self):
+        self.scheduler.enter(self.deamon_delay, 1, self._update_capacity)
         self.scheduler.run()
 
-    def _update_capacity(self, sdc_code: int, start_date: datetime):
+    def _update_capacity(self):
         if all(th.thread_finished() for th in self.threadsArray):
             self.scheduler_stop_event.set()
             return
@@ -315,10 +357,9 @@ class Container:
         print("---------------------------------------")
         tz = zoneinfo.ZoneInfo("Europe/Athens")
         currentTime: time = datetime.now(tz)
-        self.resourceSrv().postCapacity(self.route_code, self.bus_id, sdc_code, start_date,
+        self.resourceSrv().postCapacity(self.route_code, self.bus_id,
                                         self.bus_capacity, totalCount, currentTime)
-
-        self.scheduler.enter(self.deamon_delay, 1, self._update_capacity, argument=(sdc_code, start_date,))
+        self.scheduler.enter(self.deamon_delay, 1, self._update_capacity,)
 
 
 

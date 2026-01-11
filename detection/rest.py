@@ -45,16 +45,18 @@ class ResourceService:
         self.url = tmpUrl
         self.logger().logger.info(f"Resourece Server url set {self.url}")
 
-    def postCapacity(self, routeId: int, busId: int, sdc_code: int, start_time: datetime, busCapacity: int,
+    def postCapacity(self, routeId: int, busId: int, busCapacity: int,
                     passengers: int, currentTime: datetime):     
         url = f"{self.url}/api/v1/ext/capacity/{routeId}/{busId}"
         try:
             data = {
                 # "start_time": f"{start_time.isoformat()}Z",
-                "sdc_code": sdc_code,
+                # Δεν χρειάζεται εφόσον στέλνουμε το routeId και το busId.
+                # Αυτό θα χρειαζόταν εάν θέλαμε να εισάγουμε την πληρότητα για το συγκεκριμένο δρομολόγιο αλλά δεν νομίζω ότι χρειάζεται.
+                #"sdc_code": sdc_code,
                 "capacity": busCapacity,
                 "passengers": passengers,
-                "time": currentTime.isoformat(timespec="seconds").replace("+03:00", "Z")
+                "time": currentTime.strftime("%Y-%m-%dT%H:%M:%SZ")#currentTime.isoformat(timespec="seconds").replace("+03:00", "Z")
             }
 
             headers = {
