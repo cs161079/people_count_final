@@ -136,14 +136,14 @@ class PeopleCount04(pc02.PeopleCount02):
             cv2.putText(frame, f"Total: {self.passengersCount}", (20, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 165, 255), 2)
 
             # Εμφάνιση
-            cv2.imshow(self.window_name, frame)
+            # cv2.imshow(self.window_name, frame)
 
             # Έξοδος με 'q'
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                # self.stop_event.set()
-                break
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     # self.stop_event.set()
+            #     break
 
         # Καθαρισμός
         cap.release()
-        cv2.destroyWindow(self.window_name)
+        # cv2.destroyWindow(self.window_name)
         self._finished = True
