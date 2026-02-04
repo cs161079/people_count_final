@@ -71,10 +71,6 @@ class PeopleCount(threading.Thread):
 
         model = YOLO("yolov8n.pt")
 
-
-        # last_post = time.time()
-        # post_interval = 30  # seconds
-
         # Dummy function for person detection (replace with YOLO/dnn)
         def detect_people(frame):
             resultBoxes = []

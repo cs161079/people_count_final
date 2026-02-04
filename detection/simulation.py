@@ -105,10 +105,6 @@ class Simulation(PeopleCount):
         stopDelayStr = os.getenv("delay")
         if stopDelayStr != None:
             self.stop_delay = int(stopDelayStr)
-        # routeIdStr = os.getenv("route.id")
-        # if routeIdStr == None:
-        #     raise Exception("Δεν έχει ορισθεί κωδικός διαδρομής λεοφωρείου.")
-        # self.routeId = self.strToInt(routeIdStr)
 
     def run(self):
         """
@@ -116,17 +112,6 @@ class Simulation(PeopleCount):
         from stop to stop and the boarding and alighting of passengers from it.
         """
         try:
-
-            # Αυτά δεν χρειάζονται θα κάνει το Request ο εξω.
-            # last_post = time.time()
-            # post_interval = 60  # seconds
-
-            # Ούτε αυτό χρειάζεται θα το κάνει και αυτό ο έξω
-            # δεν έχει καμία δουλειά να το κάνει αυτός
-            # Από τις μεταβλητές συστήματος θα φωρτόνονται μόνο το Route_id και το 
-            # delay ανάμεσα στις στάσεις.
-
-            # self._loadEnviromentInternal()
 
             while (self.current_stop_index < len(self.stops) - 1) and not self.stop_event.is_set():
                 current_stop = self.stops[self.current_stop_index]
@@ -141,18 +126,9 @@ class Simulation(PeopleCount):
                         destination=self.stops[destination_index]
                     )
                     self.board_passenger(passenger)
-
-                # Check if it's time to post data on backend
-                # if time.time() - last_post >= post_interval:
-                #     thread = threading.Thread(target=self.updateCapacity)
-                #     thread.start()
-                #     # self.updateCapacity()
-                #     last_post = time.time()
-                # print(`f"Thread {self.thread_id} In {self.stop_delay} seconds bus move to next station."`)
                 self.logger.logger.info(f"Thread {self.thread_id} In {self.stop_delay} seconds bus move to next station.")
                 time.sleep(self.stop_delay)  # Simulate time at stop
                 self.move_to_next_stop()
-            # print(f"Thread {self.thread_id} Bus complete route. All Passengers got off in terminal")
             if self.stop_event.is_set():
                 self.logger.logger.info(f"Thread {self.thread_id} Interrupted from user.")
             else:

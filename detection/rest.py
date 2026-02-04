@@ -50,10 +50,6 @@ class ResourceService:
         url = f"{self.url}/api/v1/ext/capacity/{routeId}/{busId}"
         try:
             data = {
-                # "start_time": f"{start_time.isoformat()}Z",
-                # Δεν χρειάζεται εφόσον στέλνουμε το routeId και το busId.
-                # Αυτό θα χρειαζόταν εάν θέλαμε να εισάγουμε την πληρότητα για το συγκεκριμένο δρομολόγιο αλλά δεν νομίζω ότι χρειάζεται.
-                #"sdc_code": sdc_code,
                 "capacity": busCapacity,
                 "passengers": passengers,
                 "time": currentTime.strftime("%Y-%m-%dT%H:%M:%SZ")#currentTime.isoformat(timespec="seconds").replace("+03:00", "Z")
@@ -62,9 +58,6 @@ class ResourceService:
             headers = {
             }
             r = requests.post(url, json=data, headers=headers)
-            # if r.status_code == 401:
-            #     return self.postCapacity(busId, busCapacity, sdc_code, start_time, passengers, currentTime)
-            # else:
             self.logger().logger.info(f"{str(r.status_code)}: {r.text}")
         except Exception as e:
             self.logger().logger.info(f"Error: {e}")

@@ -21,11 +21,8 @@ class PeopleCount04(pc02.PeopleCount02):
         return
 
     def run(self):
-        # 1. Φόρτωση του μοντέλου YOLOv8 (το 'n' είναι η πιο γρήγορη έκδοση)
         # Την πρώτη φορά που θα τρέξει, θα κατεβάσει αυτόματα το αρχείο yolov8n.pt
         model = YOLO('yolov8n.pt')
-
-        # 2. Άνοιγμα Κάμερας (0 για την προεπιλεγμένη webcam)
         # cap = cv2.VideoCapture(0)
         cap = cv2.VideoCapture(self.filename)  # Μπορείτε να βάλετε και διαδρομή αρχείου βίντεο
         
@@ -68,10 +65,6 @@ class PeopleCount04(pc02.PeopleCount02):
             # line_x = int(width // 2)
 
             lineCoords = [(700, 1050), (1200, 550)]
-            # 3. Εκτέλεση Tracking με YOLOv8
-            # persist=True: Κρατάει τα IDs σταθερά μεταξύ των frames
-            # classes=0: Ανιχνεύει μόνο ανθρώπους (class 0 στο COCO dataset)
-            # tracker="bytetrack.yaml": Ένας γρήγορος αλγόριθμος tracking
             results = model.track(frame, persist=True, classes=0, verbose=False, tracker="bytetrack.yaml")
 
             # Αν υπάρχουν ανιχνεύσεις
@@ -119,9 +112,7 @@ class PeopleCount04(pc02.PeopleCount02):
                     bottom_right_y = int(y + h / 2)
                     cv2.rectangle(frame, (top_left_x, top_left_y), (bottom_right_x, bottom_right_y), (255, 255, 0), 2)
                     cv2.putText(frame, f"ID: {track_id}", (top_left_x, top_left_y - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
-            # 4. Σχεδίαση γραφικών (UI)
-            
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)            
             # Η γραμμή ελέγχου (Μπλε)                       B   G R 
             cv2.line(frame, lineCoords[0], lineCoords[1], (255, 0, 0), 2)
             # cv2.line(frame, (lineCoords[0][0], max_y), (lineCoords[1][0], max_y), (0, 255, 0), 2)
@@ -135,15 +126,18 @@ class PeopleCount04(pc02.PeopleCount02):
             self.passengersCount = max(0, self.initial_passengers + (count_in - count_out))
             cv2.putText(frame, f"Total: {self.passengersCount}", (20, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 165, 255), 2)
 
+            # Σε περίπτωση Raspbery αυτό πρέπει να φύγει
             # Εμφάνιση
-            # cv2.imshow(self.window_name, frame)
+            cv2.imshow(self.window_name, frame)
 
+            # Σε περίπτωση Raspbery αυτό πρέπει να φύγει
             # Έξοδος με 'q'
-            # if cv2.waitKey(1) & 0xFF == ord('q'):
-            #     # self.stop_event.set()
-            #     break
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                # self.stop_event.set()
+                break
 
         # Καθαρισμός
         cap.release()
-        # cv2.destroyWindow(self.window_name)
+        # Σε περίπτωση Raspbery αυτό πρέπει να φύγει
+        cv2.destroyWindow(self.window_name)
         self._finished = True

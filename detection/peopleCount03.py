@@ -13,11 +13,9 @@ class PeopleCount03(pc02.PeopleCount02):
         print(f"PeopleCount Thread {self.thread_id} initialized.")
 
     def run(self):
-        # 1. Φόρτωση του μοντέλου YOLOv8 (το 'n' είναι η πιο γρήγορη έκδοση)
         # Την πρώτη φορά που θα τρέξει, θα κατεβάσει αυτόματα το αρχείο yolov8n.pt
         model = YOLO('yolov8n.pt')
 
-        # 2. Άνοιγμα Κάμερας (0 για την προεπιλεγμένη webcam)
         # cap = cv2.VideoCapture(0)
         cap = cv2.VideoCapture(self.filename)  # Μπορείτε να βάλετε και διαδρομή αρχείου βίντεο
         
@@ -53,11 +51,6 @@ class PeopleCount03(pc02.PeopleCount02):
             
             # Ορίζουμε τη γραμμή στη μέση της οθόνης (κάθετα)
             line_x = int(width // 2)
-
-            # 3. Εκτέλεση Tracking με YOLOv8
-            # persist=True: Κρατάει τα IDs σταθερά μεταξύ των frames
-            # classes=0: Ανιχνεύει μόνο ανθρώπους (class 0 στο COCO dataset)
-            # tracker="bytetrack.yaml": Ένας γρήγορος αλγόριθμος tracking
             results = model.track(frame, persist=True, classes=0, verbose=False, tracker="bytetrack.yaml")
 
             # Αν υπάρχουν ανιχνεύσεις
@@ -82,7 +75,6 @@ class PeopleCount03(pc02.PeopleCount02):
                         track.pop(0)
 
                     curr_x, curr_y = [None, None]
-                    # --- ΛΟΓΙΚΗ ΜΕΤΡΗΣΗΣ ---
                     # Χρειαζόμαστε τουλάχιστον 2 καρέ για να δούμε κίνηση
                     if len(track) > 2:
                         prev_x, prev_y = track[-2] # Η προηγούμενη θέση Y
@@ -116,8 +108,6 @@ class PeopleCount03(pc02.PeopleCount02):
                         cv2.circle(frame, (int(curr_x), int(curr_y)), 3, (0, 255, 0), -1)
                     cv2.putText(frame, f"ID: {track_id}", (top_left_x, top_left_y - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
-
-            # 4. Σχεδίαση γραφικών (UI)
             
             # Η γραμμή ελέγχου (Μπλε)
             cv2.line(frame, (line_x, 0), (line_x, height), (255, 0, 0), 2)
